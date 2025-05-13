@@ -6,6 +6,9 @@ const uploadSpinner = document.getElementById('uploadSpinner');
 
 function showSpinner(show) {
     uploadSpinner.style.display = show ? 'block' : 'none';
+    if (show) {
+        messageDiv.innerText = ''; // Clear previous message when showing spinner
+    }
 }
 
 uploadButton.addEventListener('click', async () => {
@@ -72,6 +75,7 @@ function deleteFile(fileName) {
 
 function downloadFile(fileName) {
     showSpinner(true);
+    messageDiv.innerText = `${fileName} is being downloaded ...`; // Set downloading message after spinner
     fetch('/download', {
         method: 'POST',
         headers: {
@@ -80,18 +84,43 @@ function downloadFile(fileName) {
         body: JSON.stringify({ filename: fileName })
     })
     .then(response => response.json())
-    .then(data => {
-        showSpinner(false);
+    .then(async data => {
         if (data.error) {
+            showSpinner(false);
             messageDiv.innerText = `Error: ${data.error}`;
-        } else {
+            return;
+        }
+
+        try {
+            // Fetch the file from the signed URL
+            const fileResponse = await fetch(data.url);
+            if (!fileResponse.ok) {
+                throw new Error(`HTTP error! Status: ${fileResponse.status}`);
+            }
+
+            // Get the file as a blob
+            const blob = await fileResponse.blob();
+
+            // Create a temporary URL for the blob
+            const blobUrl = window.URL.createObjectURL(blob);
+
+            // Create a temporary link to trigger the download
             const link = document.createElement('a');
-            link.href = data.url;
+            link.href = blobUrl;
             link.download = fileName;
             document.body.appendChild(link);
             link.click();
+
+            // Clean up
             document.body.removeChild(link);
-            messageDiv.innerText = `Downloading ${fileName}...`;
+            window.URL.revokeObjectURL(blobUrl);
+
+            // Show success message after download is triggered
+            showSpinner(false);
+            messageDiv.innerText = `${fileName} successfully downloaded`;
+        } catch (error) {
+            showSpinner(false);
+            messageDiv.innerText = `Error downloading file: ${error.message}`;
         }
     })
     .catch(error => {
