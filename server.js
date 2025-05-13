@@ -65,7 +65,9 @@ app.get('/files', async (req, res) => {
     const params = { Bucket: bucketName };
     try {
         const data = await s3.listObjectsV2(params).promise();
-        res.json(data.Contents || []);
+        // Filter out directories (keys ending with '/')
+        const files = (data.Contents || []).filter(item => !item.Key.endsWith('/'));
+        res.json(files);
     } catch (error) {
         console.error('AWS Error:', error.message); // 🔍 Log the error
         res.status(500).json({ error: 'Error listing files: ' + error.message });
